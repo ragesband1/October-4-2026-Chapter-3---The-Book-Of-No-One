@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 3 - The Book Of No One</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .title-font {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 3px;
+        }
+
+        /* Health & Mana Bars Smooth fill */
+        .bar-fill {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Floating interaction prompt */
+        @keyframes floatAnim {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-float {
+            animation: floatAnim 2s infinite ease-in-out;
+        }
+
+        /* Crosshair ring glow */
+        .crosshair-glow {
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+        }
+
+        /* Canvas viewport styling */
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: grab;
+        }
+        #game-canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full overflow-hidden select-none bg-slate-950">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- HUD Layer -->
+    <div id="hud-layer" class="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 md:p-6 z-10">
+        
+        <!-- Top HUD Header -->
+        <div class="flex flex-wrap justify-between items-start gap-4 w-full">
+            <!-- Player Status Card -->
+            <div class="glass-panel rounded-2xl p-4 min-w-[280px] max-w-xs pointer-events-auto flex flex-col gap-2">
+                <div class="flex items-center justify-between border-b border-slate-700/50 pb-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                            <i class="fa-solid me-0 fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-sm text-slate-100 tracking-wide" id="hud-player-name">Memoriador</h2>
+                            <p class="text-xs text-indigo-400 font-semibold" id="hud-player-class">Scholar Novice</p>
+                        </div>
+                    </div>
+                    <div class="px-2.5 py-1 rounded-lg bg-indigo-950 border border-indigo-500/30 text-indigo-300 font-bold text-xs">
+                        Lv. <span id="hud-level">1</span>
+                    </div>
+                </div>
+
+                <!-- Health Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs font-semibold text-slate-300">
+                        <span><i class="fa-solid fa-heart text-rose-500 mr-1"></i> Health</span>
+                        <span id="hud-hp-text">100 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
+                        <div id="hud-hp-bar" class="bg-gradient-to-r from-rose-600 to-red-400 h-full bar-fill w-full"></div>
+                    </div>
+                </div>
+
+                <!-- Focus / Mana Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs font-semibold text-slate-300">
+                        <span><i class="fa-solid fa-bolt text-amber-400 mr-1"></i> Focus</span>
+                        <span id="hud-focus-text">50 / 50</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700/50">
+                        <div id="hud-focus-bar" class="bg-gradient-to-r from-amber-500 to-yellow-300 h-full bar-fill w-full"></div>
+                    </div>
+                </div>
+
+                <!-- XP Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs font-semibold text-slate-400">
+                        <span><i class="fa-solid fa-brain text-purple-400 mr-1"></i> Understanding XP</span>
+                        <span id="hud-xp-text">0 / 100</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div id="hud-xp-bar" class="bg-gradient-to-r from-purple-500 to-indigo-400 h-full bar-fill w-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Map & Controls Toggle -->
+            <div class="flex flex-col items-end gap-3 pointer-events-auto">
+                <div class="relative glass-panel p-2 rounded-2xl border-2 border-slate-700/60 overflow-hidden shadow-2xl">
+                    <canvas id="minimap-canvas" width="130" height="130" class="rounded-xl bg-slate-900"></canvas>
+                    <div class="absolute inset-0 pointer-events-none rounded-2xl border border-indigo-500/20"></div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="btn-toggle-inventory" class="px-3 py-2 rounded-xl glass-panel text-slate-200 hover:text-white hover:border-indigo-400 transition text-xs font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-bag-shopping text-indigo-400"></i> Items [I]
+                    </button>
+                    <button id="btn-toggle-skills" class="px-3 py-2 rounded-xl glass-panel text-slate-200 hover:text-white hover:border-indigo-400 transition text-xs font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-diagram-project text-purple-400"></i> Skills [K]
+                    </button>
+                    <button id="btn-toggle-controls" class="px-3 py-2 rounded-xl glass-panel text-slate-200 hover:text-white hover:border-indigo-400 transition text-xs font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-gamepad text-emerald-400"></i> Controls
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Crosshair & Interaction Prompt -->
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+            <div class="w-3 h-3 rounded-full border-2 border-indigo-400/80 crosshair-glow bg-indigo-500/30"></div>
+            <div id="interaction-prompt" class="hidden mt-4 px-4 py-2 rounded-xl glass-panel text-amber-300 font-bold text-sm tracking-wide animate-float flex items-center gap-2 border border-amber-500/30">
+                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 text-xs border border-amber-400/40">E</span>
+                <span id="interaction-text">Interact with Teacher Understander</span>
+            </div>
+        </div>
+
+        <!-- Quest Log Overlay (Top Left Floating) -->
+        <div class="absolute top-48 left-6 glass-panel rounded-xl p-3 max-w-xs pointer-events-auto border-l-4 border-l-indigo-500">
+            <div class="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-scroll"></i> Active Quest
+            </div>
+            <h3 id="quest-title" class="font-semibold text-slate-100 text-sm">Consult Teacher Understander</h3>
+            <p id="quest-desc" class="text-xs text-slate-300 mt-1 leading-relaxed">Head into the central courtyard and speak with Teacher Understander about your study methods.</p>
+            <div class="mt-2 text-xs font-bold text-amber-400 flex items-center justify-between border-t border-slate-700/40 pt-1.5">
+                <span>Objective:</span>
+                <span id="quest-progress">0 / 1</span>
+            </div>
+        </div>
+
+        <!-- Bottom Action Bar / Skill Hotbar -->
+        <div class="w-full flex justify-center items-end pointer-events-auto mb-2">
+            <div class="glass-panel p-2.5 rounded-2xl flex items-center gap-3 border border-indigo-500/20 shadow-2xl">
+                <!-- Skill 1 -->
+                <button id="skill-1-btn" class="relative group w-14 h-14 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-indigo-400 flex flex-col items-center justify-center transition p-1 overflow-hidden">
+                    <span class="absolute top-1 left-1 text-[10px] font-extrabold text-slate-400 group-hover:text-indigo-300">1</span>
+                    <i class="fa-solid fa-compress text-indigo-400 text-lg mb-0.5"></i>
+                    <span class="text-[9px] font-bold text-slate-300 truncate w-full text-center">Concentrate</span>
+                    <div class="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                </button>
+                
+                <!-- Skill 2 -->
+                <button id="skill-2-btn" class="relative group w-14 h-14 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-purple-400 flex flex-col items-center justify-center transition p-1 overflow-hidden">
+                    <span class="absolute top-1 left-1 text-[10px] font-extrabold text-slate-400 group-hover:text-purple-300">2</span>
+                    <i class="fa-solid fa-puzzle-piece text-purple-400 text-lg mb-0.5"></i>
+                    <span class="text-[9px] font-bold text-slate-300 truncate w-full text-center">Guessing</span>
+                    <div class="absolute inset-0 bg-purple-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                </button>
+
+                <!-- Skill 3 -->
+                <button id="skill-3-btn" class="relative group w-14 h-14 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-amber-400 flex flex-col items-center justify-center transition p-1 overflow-hidden">
+                    <span class="absolute top-1 left-1 text-[10px] font-extrabold text-slate-400 group-hover:text-amber-300">3</span>
+                    <i class="fa-solid fa-shield-halved text-amber-400 text-lg mb-0.5"></i>
+                    <span class="text-[9px] font-bold text-slate-300 truncate w-full text-center">Focus Shield</span>
+                    <div class="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                </button>
+
+                <!-- Skill 4 -->
+                <button id="skill-4-btn" class="relative group w-14 h-14 rounded-xl bg-slate-800/90 border border-slate-700 hover:border-cyan-400 flex flex-col items-center justify-center transition p-1 overflow-hidden">
+                    <span class="absolute top-1 left-1 text-[10px] font-extrabold text-slate-400 group-hover:text-cyan-300">4</span>
+                    <i class="fa-solid fa-wand-magic-sparkles text-cyan-400 text-lg mb-0.5"></i>
+                    <span class="text-[9px] font-bold text-slate-300 truncate w-full text-center">Imagination</span>
+                    <div class="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialogue Modal Window -->
+    <div id="dialogue-modal" class="hidden fixed inset-x-0 bottom-12 mx-auto max-w-2xl z-30 p-4 pointer-events-auto">
+        <div class="glass-panel rounded-2xl p-6 border border-indigo-500/40 shadow-2xl relative bg-slate-900/95">
+            <div class="flex items-start gap-4">
+                <div id="npc-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-700 to-purple-600 flex-shrink-0 flex items-center justify-center text-2xl text-white shadow-lg border border-indigo-400/30">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+                <div class="flex-1 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <h3 id="npc-name" class="font-extrabold text-lg text-indigo-300 title-font tracking-wide">Teacher Understander</h3>
+                        <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-500/30">Academic Master</span>
+                    </div>
+                    <p id="dialogue-text" class="text-sm text-slate-200 leading-relaxed font-normal min-h-[50px]">
+                        "Memoriador, memorizing 200 identification questions will only give you half understanding! You must learn to focus, imagine, and truly comprehend."
+                    </p>
+                    <div class="flex justify-end pt-2 gap-3">
+                        <button id="dialogue-next-btn" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs tracking-wider uppercase transition shadow-lg flex items-center gap-2">
+                            <span>Continue</span> <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Modal -->
+    <div id="inventory-modal" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-6 border border-indigo-500/30 shadow-2xl flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+                <h2 class="text-xl font-bold title-font text-indigo-300 flex items-center gap-2">
+                    <i class="fa-solid fa-bag-shopping text-indigo-400"></i> Academic Inventory
+                </h2>
+                <button id="close-inventory" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="inventory-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-80 overflow-y-auto p-1">
+                <!-- Inventory slots populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Skill Tree Modal -->
+    <div id="skills-modal" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-2xl rounded-3xl p-6 border border-purple-500/30 shadow-2xl flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+                <div>
+                    <h2 class="text-xl font-bold title-font text-purple-300 flex items-center gap-2">
+                        <i class="fa-solid fa-diagram-project text-purple-400"></i> Psycholinguistic Skill Tree
+                    </h2>
+                    <p class="text-xs text-slate-400">Spend Understanding Points (UP) to boost your mental capabilities.</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs text-slate-400">Available Points:</span>
+                    <p class="text-lg font-bold text-amber-400" id="skill-points-count">0 UP</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-2">
+                <!-- Node 1: Focus -->
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-700 hover:border-indigo-500/50 transition flex flex-col justify-between">
+                    <div>
+                        <div class="w-10 h-10 rounded-xl bg-indigo-900/60 border border-indigo-500/40 text-indigo-300 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-100 text-sm">Deep Focus</h3>
+                        <p class="text-xs text-slate-400 mt-1">Increases max Focus capacity and defense against memory distractions.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+                        <span class="text-xs text-indigo-400 font-semibold" id="skill-focus-lvl">Lv. 0 / 5</span>
+                        <button onclick="upgradeSkill('focus')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Node 2: Imagination -->
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-700 hover:border-cyan-500/50 transition flex flex-col justify-between">
+                    <div>
+                        <div class="w-10 h-10 rounded-xl bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-100 text-sm">Vivid Imagination</h3>
+                        <p class="text-xs text-slate-400 mt-1">Boosts attack power of Imagination Blast against exams and shadow bosses.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+                        <span class="text-xs text-cyan-400 font-semibold" id="skill-imagination-lvl">Lv. 0 / 5</span>
+                        <button onclick="upgradeSkill('imagination')" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs">Upgrade</button>
+                    </div>
+                </div>
+
+                <!-- Node 3: Psycholinguistics -->
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-700 hover:border-purple-500/50 transition flex flex-col justify-between">
+                    <div>
+                        <div class="w-10 h-10 rounded-xl bg-purple-900/60 border border-purple-500/40 text-purple-300 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-puzzle-piece"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-100 text-sm">Contextual Guessing</h3>
+                        <p class="text-xs text-slate-400 mt-1">Increases critical hit chance and psycholinguistic guessing accuracy.</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+                        <span class="text-xs text-purple-400 font-semibold" id="skill-psycho-lvl">Lv. 0 / 5</span>
+                        <button onclick="upgradeSkill('psycho')" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs">Upgrade</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button id="close-skills" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs">Close Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Overlay Modal -->
+    <div id="controls-modal" class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-emerald-500/30 shadow-2xl flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+                <h2 class="text-xl font-bold title-font text-emerald-300 flex items-center gap-2">
+                    <i class="fa-solid fa-gamepad text-emerald-400"></i> Academy Guide & Controls
+                </h2>
+                <button id="close-controls" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs text-slate-300">
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Move Player</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">W A S D</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Camera Orbit / Look</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">Left Mouse Drag</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Interact / Talk / Collect</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">E</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Cast Skill Abilities</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">Keys 1, 2, 3, 4</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Jump</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">Spacebar</span>
+                </div>
+                <div class="flex justify-between items-center p-2 rounded-lg bg-slate-900/60">
+                    <span class="font-semibold text-slate-200">Sprint</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 font-mono text-amber-300">Shift</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start / Title Overlay -->
+    <div id="start-overlay" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-6 text-center">
+        <div class="max-w-xl flex flex-col items-center space-y-6">
+            <div class="inline-block p-3 rounded-2xl bg-indigo-900/40 border border-indigo-500/30 text-indigo-400 mb-2">
+                <i class="fa-solid fa-book-bookmark text-4xl"></i>
+            </div>
+            <h1 class="text-3xl md:text-5xl font-extrabold title-font tracking-wide bg-gradient-to-r from-indigo-300 via-purple-300 to-amber-200 bg-clip-text text-transparent">
+                Chapter 3: The Book Of No One
+            </h1>
+            <p class="text-xs md:text-sm text-indigo-300/80 font-mono uppercase tracking-widest">
+                Visions Of Understandings & The Rages Band
+            </p>
+            <p class="text-sm text-slate-300 leading-relaxed max-w-lg">
+                Step into <span class="text-indigo-400 font-bold">Better Understanding School Academy</span> as Memoriador. Move past rote memorization, embrace focus and imagination, and face the shadow legend <span class="text-purple-400 font-bold">"The Book Of No One"</span>.
+            </p>
+            <button id="start-game-btn" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold text-base tracking-wider uppercase transition transform hover:scale-105 shadow-2xl border border-indigo-400/30">
+                Enter Academy Campus
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Web Audio Synthesizer for SFX & Atmosphere
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playTone(freq, type = 'sine', duration = 0.2, gainVal = 0.1) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e){}
+            }
+            playSkillSound(type) {
+                this.init();
+                if (type === 'concentrate') {
+                    this.playTone(300, 'sine', 0.4, 0.15);
+                    setTimeout(() => this.playTone(600, 'sine', 0.3, 0.12), 100);
+                } else if (type === 'guess') {
+                    this.playTone(800, 'triangle', 0.15, 0.1);
+                    setTimeout(() => this.playTone(1200, 'triangle', 0.2, 0.1), 80);
+                } else if (type === 'shield') {
+                    this.playTone(200, 'sawtooth', 0.5, 0.1);
+                } else if (type === 'imagination') {
+                    this.playTone(400, 'sine', 0.2, 0.15);
+                    setTimeout(() => this.playTone(800, 'sawtooth', 0.4, 0.2), 150);
+                } else if (type === 'hit') {
+                    this.playTone(150, 'square', 0.15, 0.2);
+                } else if (type === 'collect') {
+                    this.playTone(523.25, 'sine', 0.1, 0.15);
+                    setTimeout(() => this.playTone(659.25, 'sine', 0.2, 0.15), 100);
+                }
+            }
+        }
+        const audioFX = new SoundEngine();
+
+        // Game State Management
+        const gameState = {
+            started: false,
+            player: {
+                level: 1,
+                xp: 0,
+                xpToNext: 100,
+                hp: 100,
+                maxHp: 100,
+                focus: 50,
+                maxFocus: 50,
+                skillPoints: 0,
+                stats: {
+                    focusLevel: 0,
+                    imaginationLevel: 0,
+                    psychoLevel: 0
+                },
+                inventory: [
+                    { id: 'ref_book', name: 'Reference Book', icon: 'fa-book-open', desc: 'Standard study manual. Gives +10 Max Focus.' },
+                    { id: 'focus_tonic', name: 'Focus Tonic', icon: 'fa-flask', desc: 'Restores 25 Focus points.' }
+                ]
+            },
+            quest: {
+                step: 1,
+                pagesCollected: 0,
+                totalPages: 5,
+                bossDefeated: false
+            },
+            dialogue: {
+                active: false,
+                lines: [],
+                currentIndex: 0,
+                onComplete: null
+            }
+        };
+
+        // Three.js Scene Setup
+        let scene, camera, renderer;
+        let playerMesh, playerBody;
+        let npcs = [];
+        let enemies = [];
+        let pagePickups = [];
+        let clock = new THREE.Clock();
+
+        // Controls state
+        const keys = {};
+        let cameraAngleX = 0;
+        let cameraAngleY = 0.3;
+        let isMouseDown = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x818cf8, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff7ed, 1.2);
+            sunLight.position.set(40, 60, 30);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 200;
+            const d = 60;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            // Courtyard ground / environment
+            buildAcademyEnvironment();
+
+            // Player mesh setup
+            createPlayerMesh();
+
+            // NPCs creation
+            createNPCs();
+
+            // Understanding Pages collection setup
+            spawnUnderstandingPages();
+
+            // Event Listeners for Controls
+            setupEventListeners();
+
+            // Animation Loop
+            animate();
+        }
+
+        function buildAcademyEnvironment() {
+            // Main Courtyard Floor
+            const groundGeo = new THREE.PlaneGeometry(140, 140);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Pathway Grid
+            const pathGeo = new THREE.PlaneGeometry(16, 140);
+            const pathMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+            const path1 = new THREE.Mesh(pathGeo, pathMat);
+            path1.rotation.x = -Math.PI / 2;
+            path1.position.y = 0.01;
+            path1.receiveShadow = true;
+            scene.add(path1);
+
+            const path2 = new THREE.Mesh(pathGeo, pathMat);
+            path2.rotation.x = -Math.PI / 2;
+            path2.rotation.z = Math.PI / 2;
+            path2.position.y = 0.01;
+            path2.receiveShadow = true;
+            scene.add(path2);
+
+            // Center Fountain / Monument
+            const fountainBaseGeo = new THREE.CylinderGeometry(8, 9, 1.2, 16);
+            const fountainMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+            const fountainBase = new THREE.Mesh(fountainBaseGeo, fountainMat);
+            fountainBase.position.set(0, 0.6, 0);
+            fountainBase.castShadow = true;
+            fountainBase.receiveShadow = true;
+            scene.add(fountainBase);
+
+            // Water emblem core
+            const waterGeo = new THREE.CylinderGeometry(6.5, 6.5, 0.2, 16);
+            const waterMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.2, metalness: 0.5 });
+            const water = new THREE.Mesh(waterGeo, waterMat);
+            water.position.set(0, 1.2, 0);
+            scene.add(water);
+
+            // Buildings (Academy Wings & Library)
+            // 1. Library Arena Wing (North)
+            createBuilding(-30, 0, -45, 40, 16, 25, 0x312e81, "LIBRARY");
+            // 2. Main Classrooms Wing (East)
+            createBuilding(45, 0, 0, 25, 14, 50, 0x1e1b4b, "ACADEMY HALL");
+            // 3. Visions Wing (West)
+            createBuilding(-45, 0, 0, 25, 14, 50, 0x1e1b4b, "VISIONS WING");
+
+            // Perimeter Trees
+            for (let i = -60; i <= 60; i += 20) {
+                if (Math.abs(i) > 10) {
+                    createTree(i, -60);
+                    createTree(i, 60);
+                    createTree(-60, i);
+                    createTree(60, i);
+                }
+            }
+        }
+
+        function createBuilding(x, y, z, w, h, d, colorHex, labelText) {
+            const group = new THREE.Group();
+            const bldgGeo = new THREE.BoxGeometry(w, h, d);
+            const bldgMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const bldg = new THREE.Mesh(bldgGeo, bldgMat);
+            bldg.position.y = h / 2;
+            bldg.castShadow = true;
+            bldg.receiveShadow = true;
+            group.add(bldg);
+
+            // Decorative Roof rim
+            const roofGeo = new THREE.BoxGeometry(w + 2, 1.5, d + 2);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x4f46e5 });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.y = h + 0.75;
+            group.add(roof);
+
+            // Glowing entrance door
+            const doorGeo = new THREE.BoxGeometry(6, 8, 1);
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0xa5b4fc, emissive: 0x4338ca, emissiveIntensity: 0.5 });
+            const door = new THREE.Mesh(doorGeo, doorMat);
+            door.position.set(0, 4, d / 2 + 0.1);
+            group.add(door);
+
+            group.position.set(x, y, z);
+            scene.add(group);
+        }
+
+        function createTree(x, z) {
+            const group = new THREE.Group();
+            const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 4);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            const leavesGeo = new THREE.DodecahedronGeometry(3);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x065f46, roughness: 0.9 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 5;
+            leaves.castShadow = true;
+            group.add(leaves);
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+        }
+
+        function createPlayerMesh() {
+            playerMesh = new THREE.Group();
+
+            // Body
+            const bodyGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4f46e5, roughness: 0.4 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.9;
+            body.castShadow = true;
+            playerMesh.add(body);
+
+            // Head
+            const headGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.1;
+            head.castShadow = true;
+            playerMesh.add(head);
+
+            // Academic Cap
+            const capGeo = new THREE.BoxGeometry(1.1, 0.1, 1.1);
+            const capMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b });
+            const cap = new THREE.Mesh(capGeo, capMat);
+            cap.position.y = 2.5;
+            playerMesh.add(cap);
+
+            playerMesh.position.set(0, 0, 25);
+            scene.add(playerMesh);
+        }
+
+        function createNPCs() {
+            // Teacher Understander NPC
+            const teacherGroup = new THREE.Group();
+            const bodyGeo = new THREE.CylinderGeometry(0.6, 0.6, 2, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x059669 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1;
+            teacherGroup.add(body);
+
+            const headGeo = new THREE.SphereGeometry(0.55, 16, 16);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xfef08a });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.2;
+            teacherGroup.add(head);
+
+            teacherGroup.position.set(0, 0, 10);
+            scene.add(teacherGroup);
+
+            npcs.push({
+                id: 'understander',
+                name: 'Teacher Understander',
+                mesh: teacherGroup,
+                dialogue: [
+                    "Welcome Memoriador! I am concern for your academic future.",
+                    "Memorizing 200 identification answers without comprehension will lead to 50/C grades and lost records!",
+                    "You must concentrate, focus, and use your imagination to truly understand.",
+                    "Go around the Academy campus and collect the 5 'Understanding Pages' to strengthen your brain!"
+                ]
+            });
+        }
+
+        function spawnUnderstandingPages() {
+            const pageCoords = [
+                { x: -15, z: -10 },
+                { x: 18, z: -15 },
+                { x: -25, z: 20 },
+                { x: 25, z: 22 },
+                { x: 0, z: -30 }
+            ];
+
+            const pageGeo = new THREE.BoxGeometry(0.8, 0.1, 1.2);
+            const pageMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.6 });
+
+            pageCoords.forEach((pos, idx) => {
+                const mesh = new THREE.Mesh(pageGeo, pageMat);
+                mesh.position.set(pos.x, 1, pos.z);
+                scene.add(mesh);
+                pagePickups.push({ id: idx, mesh: mesh, collected: false });
+            });
+        }
+
+        function spawnBossBookOfNoOne() {
+            // Shadow Boss Teacher Unknown / The Book Of No One
+            const bossGroup = new THREE.Group();
+
+            const bodyGeo = new THREE.CylinderGeometry(1, 1.2, 3.2, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1.6;
+            bossGroup.add(body);
+
+            // Floating Shadow Aura
+            const auraGeo = new THREE.SphereGeometry(2, 16, 16);
+            const auraMat = new THREE.MeshStandardMaterial({ color: 0x7e22ce, wireframe: true });
+            const aura = new THREE.Mesh(auraGeo, auraMat);
+            aura.position.y = 2;
+            bossGroup.add(aura);
+
+            bossGroup.position.set(-30, 0, -35);
+            scene.add(bossGroup);
+
+            const boss = {
+                id: 'book_of_no_one',
+                name: 'The Book Of No One',
+                mesh: bossGroup,
+                hp: 300,
+                maxHp: 300,
+                isBoss: true
+            };
+
+            enemies.push(boss);
+
+            npcs.push({
+                id: 'unknown_boss',
+                name: 'Teacher Unknown / The Book Of No One',
+                mesh: bossGroup,
+                dialogue: [
+                    "Hahaha! I am Teacher Unknown, legend of rote memorization!",
+                    "You think you can pass 'Better Understanding School' with deep comprehension?",
+                    "Face my 500-Item Identification & Enumeration Mind Assault!"
+                ]
+            });
+        }
+
+        function setupEventListeners() {
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+
+                // Action Hotkeys
+                if (e.key === '1') castSkill(1);
+                if (e.key === '2') castSkill(2);
+                if (e.key === '3') castSkill(3);
+                if (e.key === '4') castSkill(4);
+                if (e.key.toLowerCase() === 'e') triggerInteraction();
+                if (e.key.toLowerCase() === 'i') toggleModal('inventory-modal');
+                if (e.key.toLowerCase() === 'k') toggleModal('skills-modal');
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+            });
+
+            const canvas = document.getElementById('game-canvas');
+            canvas.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isMouseDown) return;
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+
+                cameraAngleX -= deltaX * 0.005;
+                cameraAngleY += deltaY * 0.005;
+                cameraAngleY = Math.max(0.1, Math.min(Math.PI / 2.5, cameraAngleY));
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('resize', onWindowResize);
+
+            // Modal Buttons
+            document.getElementById('start-game-btn').onclick = startGame;
+            document.getElementById('btn-toggle-inventory').onclick = () => toggleModal('inventory-modal');
+            document.getElementById('btn-toggle-skills').onclick = () => toggleModal('skills-modal');
+            document.getElementById('btn-toggle-controls').onclick = () => toggleModal('controls-modal');
+            document.getElementById('close-inventory').onclick = () => toggleModal('inventory-modal');
+            document.getElementById('close-skills').onclick = () => toggleModal('skills-modal');
+            document.getElementById('close-controls').onclick = () => toggleModal('controls-modal');
+            document.getElementById('dialogue-next-btn').onclick = advanceDialogue;
+
+            document.getElementById('skill-1-btn').onclick = () => castSkill(1);
+            document.getElementById('skill-2-btn').onclick = () => castSkill(2);
+            document.getElementById('skill-3-btn').onclick = () => castSkill(3);
+            document.getElementById('skill-4-btn').onclick = () => castSkill(4);
+        }
+
+        function toggleModal(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function startGame() {
+            document.getElementById('start-overlay').classList.add('hidden');
+            gameState.started = true;
+            audioFX.init();
+            renderInventoryUI();
+            updateHUD();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (gameState.started) {
+                updatePlayerMovement(delta);
+                updateCamera();
+                updatePickups(delta);
+                updateEnemies(delta);
+                checkInteractions();
+                renderMinimap();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updatePlayerMovement(delta) {
+            const moveSpeed = keys['shift'] ? 12 : 7;
+            const moveVector = new THREE.Vector3();
+
+            if (keys['w'] || keys['arrowup']) moveVector.z -= 1;
+            if (keys['s'] || keys['arrowdown']) moveVector.z += 1;
+            if (keys['a'] || keys['arrowleft']) moveVector.x -= 1;
+            if (keys['d'] || keys['arrowright']) moveVector.x += 1;
+
+            if (moveVector.lengthSq() > 0) {
+                moveVector.normalize();
+                // Rotate vector according to camera rotation
+                moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngleX);
+
+                playerMesh.position.x += moveVector.x * moveSpeed * delta;
+                playerMesh.position.z += moveVector.z * moveSpeed * delta;
+
+                // Face movement direction
+                const angle = Math.atan2(moveVector.x, moveVector.z);
+                playerMesh.rotation.y = angle;
+            }
+
+            // Boundary clamping inside campus
+            playerMesh.position.x = Math.max(-65, Math.min(65, playerMesh.position.x));
+            playerMesh.position.z = Math.max(-65, Math.min(65, playerMesh.position.z));
+        }
+
+        function updateCamera() {
+            const distance = 14;
+            camera.position.x = playerMesh.position.x + distance * Math.sin(cameraAngleX) * Math.cos(cameraAngleY);
+            camera.position.y = playerMesh.position.y + distance * Math.sin(cameraAngleY) + 2;
+            camera.position.z = playerMesh.position.z + distance * Math.cos(cameraAngleX) * Math.cos(cameraAngleY);
+
+            camera.lookAt(playerMesh.position.x, playerMesh.position.y + 1.5, playerMesh.position.z);
+        }
+
+        function updatePickups(delta) {
+            pagePickups.forEach(p => {
+                if (!p.collected) {
+                    p.mesh.rotation.y += 1.5 * delta;
+                    const dist = playerMesh.position.distanceTo(p.mesh.position);
+                    if (dist < 2) {
+                        p.collected = true;
+                        scene.remove(p.mesh);
+                        audioFX.playSkillSound('collect');
+                        gameState.quest.pagesCollected++;
+                        updateQuestProgress();
+                    }
+                }
+            });
+        }
+
+        function updateEnemies(delta) {
+            enemies.forEach(enemy => {
+                if (enemy.hp > 0) {
+                    // Slight floating or rotation animation for shadow boss
+                    enemy.mesh.rotation.y += 0.8 * delta;
+                }
+            });
+        }
+
+        function checkInteractions() {
+            const prompt = document.getElementById('interaction-prompt');
+            const promptText = document.getElementById('interaction-text');
+            let foundTarget = false;
+
+            // Check distance to NPCs
+            npcs.forEach(npc => {
+                const dist = playerMesh.position.distanceTo(npc.mesh.position);
+                if (dist < 4.5) {
+                    foundTarget = true;
+                    promptText.textContent = `Talk to ${npc.name}`;
+                    prompt.classList.remove('hidden');
+                }
+            });
+
+            if (!foundTarget) {
+                prompt.classList.add('hidden');
+            }
+        }
+
+        function triggerInteraction() {
+            npcs.forEach(npc => {
+                const dist = playerMesh.position.distanceTo(npc.mesh.position);
+                if (dist < 4.5) {
+                    openDialogue(npc.name, npc.dialogue, () => {
+                        if (npc.id === 'understander' && gameState.quest.step === 1) {
+                            gameState.quest.step = 2;
+                            updateQuestUI("Collect Understanding Pages", "Search the courtyard grounds for 5 scattered pages.", `0 / ${gameState.quest.totalPages}`);
+                        } else if (npc.id === 'unknown_boss' && gameState.quest.step === 3) {
+                            // Trigger combat start
+                        }
+                    });
+                }
+            });
+        }
+
+        function openDialogue(name, lines, onComplete) {
+            gameState.dialogue.active = true;
+            gameState.dialogue.lines = lines;
+            gameState.dialogue.currentIndex = 0;
+            gameState.dialogue.onComplete = onComplete;
+
+            document.getElementById('npc-name').textContent = name;
+            document.getElementById('dialogue-text').textContent = lines[0];
+            document.getElementById('dialogue-modal').classList.remove('hidden');
+        }
+
+        function advanceDialogue() {
+            gameState.dialogue.currentIndex++;
+            if (gameState.dialogue.currentIndex < gameState.dialogue.lines.length) {
+                document.getElementById('dialogue-text').textContent = gameState.dialogue.lines[gameState.dialogue.currentIndex];
+            } else {
+                document.getElementById('dialogue-modal').classList.add('hidden');
+                gameState.dialogue.active = false;
+                if (gameState.dialogue.onComplete) gameState.dialogue.onComplete();
+            }
+        }
+
+        function updateQuestProgress() {
+            if (gameState.quest.step === 2) {
+                document.getElementById('quest-progress').textContent = `${gameState.quest.pagesCollected} / ${gameState.quest.totalPages}`;
+                if (gameState.quest.pagesCollected >= gameState.quest.totalPages) {
+                    gameState.quest.step = 3;
+                    spawnBossBookOfNoOne();
+                    updateQuestUI(
+                        "Defeat Teacher Unknown",
+                        "Confront 'The Book Of No One' in the North Library arena!",
+                        "0 / 1 Boss Defeated"
+                    );
+                    addXP(50);
+                }
+            }
+        }
+
+        function updateQuestUI(title, desc, progressText) {
+            document.getElementById('quest-title').textContent = title;
+            document.getElementById('quest-desc').textContent = desc;
+            document.getElementById('quest-progress').textContent = progressText;
+        }
+
+        function castSkill(skillNum) {
+            if (!gameState.started) return;
+
+            let focusCost = 0;
+            if (skillNum === 1) { // Concentrate Pulse
+                focusCost = 10;
+                if (gameState.player.focus < focusCost) return;
+                gameState.player.focus -= focusCost;
+                audioFX.playSkillSound('concentrate');
+                dealAreaDamage(25 + gameState.player.stats.focusLevel * 5);
+            } else if (skillNum === 2) { // Psycholinguistic Guess
+                focusCost = 15;
+                if (gameState.player.focus < focusCost) return;
+                gameState.player.focus -= focusCost;
+                audioFX.playSkillSound('guess');
+                dealAreaDamage(35 + gameState.player.stats.psychoLevel * 8);
+            } else if (skillNum === 3) { // Focus Shield
+                focusCost = 20;
+                if (gameState.player.focus < focusCost) return;
+                gameState.player.focus -= focusCost;
+                audioFX.playSkillSound('shield');
+                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + 20);
+            } else if (skillNum === 4) { // Imagination Blast
+                focusCost = 25;
+                if (gameState.player.focus < focusCost) return;
+                gameState.player.focus -= focusCost;
+                audioFX.playSkillSound('imagination');
+                dealAreaDamage(60 + gameState.player.stats.imaginationLevel * 12);
+            }
+
+            updateHUD();
+        }
+
+        function dealAreaDamage(amount) {
+            enemies.forEach(enemy => {
+                const dist = playerMesh.position.distanceTo(enemy.mesh.position);
+                if (dist < 12 && enemy.hp > 0) {
+                    enemy.hp -= amount;
+                    audioFX.playSkillSound('hit');
+
+                    if (enemy.hp <= 0) {
+                        enemy.hp = 0;
+                        scene.remove(enemy.mesh);
+                        addXP(100);
+                        if (enemy.isBoss) {
+                            gameState.quest.bossDefeated = true;
+                            updateQuestUI(
+                                "Bachelor's Degree Complete!",
+                                "You defeated 'The Book Of No One'! You graduated with a Bachelor's Of Understanding!",
+                                "GRADUATED!"
+                            );
+                        }
+                    }
+                }
+            });
+        }
+
+        function addXP(amount) {
+            gameState.player.xp += amount;
+            if (gameState.player.xp >= gameState.player.xpToNext) {
+                gameState.player.level++;
+                gameState.player.xp -= gameState.player.xpToNext;
+                gameState.player.xpToNext = Math.floor(gameState.player.xpToNext * 1.5);
+                gameState.player.skillPoints += 1;
+                gameState.player.maxHp += 20;
+                gameState.player.hp = gameState.player.maxHp;
+                gameState.player.maxFocus += 10;
+                gameState.player.focus = gameState.player.maxFocus;
+            }
+            updateHUD();
+        }
+
+        function upgradeSkill(type) {
+            if (gameState.player.skillPoints <= 0) return;
+
+            if (type === 'focus' && gameState.player.stats.focusLevel < 5) {
+                gameState.player.stats.focusLevel++;
+                gameState.player.skillPoints--;
+            } else if (type === 'imagination' && gameState.player.stats.imaginationLevel < 5) {
+                gameState.player.stats.imaginationLevel++;
+                gameState.player.skillPoints--;
+            } else if (type === 'psycho' && gameState.player.stats.psychoLevel < 5) {
+                gameState.player.stats.psychoLevel++;
+                gameState.player.skillPoints--;
+            }
+
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('hud-level').textContent = gameState.player.level;
+            document.getElementById('hud-hp-text').textContent = `${gameState.player.hp} / ${gameState.player.maxHp}`;
+            document.getElementById('hud-hp-bar').style.width = `${(gameState.player.hp / gameState.player.maxHp) * 100}%`;
+
+            document.getElementById('hud-focus-text').textContent = `${gameState.player.focus} / ${gameState.player.maxFocus}`;
+            document.getElementById('hud-focus-bar').style.width = `${(gameState.player.focus / gameState.player.maxFocus) * 100}%`;
+
+            document.getElementById('hud-xp-text').textContent = `${gameState.player.xp} / ${gameState.player.xpToNext}`;
+            document.getElementById('hud-xp-bar').style.width = `${(gameState.player.xp / gameState.player.xpToNext) * 100}%`;
+
+            document.getElementById('skill-points-count').textContent = `${gameState.player.skillPoints} UP`;
+            document.getElementById('skill-focus-lvl').textContent = `Lv. ${gameState.player.stats.focusLevel} / 5`;
+            document.getElementById('skill-imagination-lvl').textContent = `Lv. ${gameState.player.stats.imaginationLevel} / 5`;
+            document.getElementById('skill-psycho-lvl').textContent = `Lv. ${gameState.player.stats.psychoLevel} / 5`;
+        }
+
+        function renderInventoryUI() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = '';
+
+            gameState.player.inventory.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'p-3 rounded-2xl bg-slate-900/90 border border-slate-700 flex flex-col items-center text-center gap-1';
+                itemEl.innerHTML = `
+                    <div class="w-10 h-10 rounded-xl bg-indigo-900/50 flex items-center justify-center text-indigo-300 text-lg">
+                        <i class="fa-solid ${item.icon}"></i>
+                    </div>
+                    <span class="font-bold text-xs text-slate-200 mt-1">${item.name}</span>
+                    <p class="text-[10px] text-slate-400 leading-tight">${item.desc}</p>
+                `;
+                grid.appendChild(itemEl);
+            });
+        }
+
+        function renderMinimap() {
+            const miniCanvas = document.getElementById('minimap-canvas');
+            const ctx = miniCanvas.getContext('2d');
+            ctx.clearRect(0, 0, 130, 130);
+
+            // Center of radar
+            const cx = 65;
+            const cy = 65;
+            const scale = 0.8;
+
+            // Background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 130, 130);
+
+            // Campus boundary
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx - 50 * scale, cy - 50 * scale, 100 * scale, 100 * scale);
+
+            // Pages radar dots
+            pagePickups.forEach(p => {
+                if (!p.collected) {
+                    const rx = cx + (p.mesh.position.x - playerMesh.position.x) * scale;
+                    const ry = cy + (p.mesh.position.z - playerMesh.position.z) * scale;
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Enemies/Boss radar dot
+            enemies.forEach(e => {
+                if (e.hp > 0) {
+                    const rx = cx + (e.mesh.position.x - playerMesh.position.x) * scale;
+                    const ry = cy + (e.mesh.position.z - playerMesh.position.z) * scale;
+                    ctx.fillStyle = '#a855f7';
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Player Marker (center)
+            ctx.fillStyle = '#6366f1';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = function() {
+            init3D();
+        };
+    </script>
+</body>
+</html>
